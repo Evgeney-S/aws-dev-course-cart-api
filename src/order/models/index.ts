@@ -7,8 +7,19 @@ export type Order = {
   cartId: string;
   address: Address;
   statusHistory: Array<{
-    status: OrderStatus.Open;
+    status: OrderStatus;
     timestamp: number;
     comment: string;
   }>;
+};
+
+export type OrderRow = {
+    id: string;
+    user_id: string;
+    cart_id: string;
+    status: OrderStatus;
+    comments: string | null;
+    delivery: any;
+    payment: any;
+    totlal: string;
 };

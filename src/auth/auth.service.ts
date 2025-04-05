@@ -22,7 +22,14 @@ export class AuthService {
       throw new BadRequestException('User with such name already exists');
     }
 
-    const { id: userId } = this.usersService.createOne(payload);
+    const createdUser = this.usersService.createOne(payload);
+
+    if (!createdUser) {
+      throw new BadRequestException('Failed to create user');
+    }
+
+    const { id: userId } = createdUser;
+
     return { userId };
   }
 
@@ -33,7 +40,13 @@ export class AuthService {
       return user;
     }
 
-    return this.usersService.createOne({ name, password });
+    const createdUser = this.usersService.createOne({ name, password });
+
+    if (!createdUser) {
+      throw new BadRequestException('Failed to create user');
+    }
+
+    return createdUser;
   }
 
   login(user: User, type: 'jwt' | 'basic' | 'default'): TokenResponse {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { User } from '../models';
+import * as db from '../../db';
 
 @Injectable()
 export class UsersService {
@@ -10,21 +11,37 @@ export class UsersService {
     this.users = {};
   }
 
-  findOne(name: string): User {
-    for (const id in this.users) {
-      if (this.users[id].name === name) {
-        return this.users[id];
-      }
+    findOne(name: string): User | null {
+        try {
+            const result: any = db.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [name]);
+
+            if (result.rowCount === 0) {
+                return null;
+            } else {
+                return result.rows[0];
+            }
+
+        } catch (error) {
+            console.error('Error fetching user by name:', error);
+            throw error;
+        }
     }
-    return;
-  }
 
-  createOne({ name, password }: User): User {
-    const id = randomUUID();
-    const newUser = { id, name, password };
+    createOne({ name, password }: User): User | null {
+        try {
+            const result: any = db.query(
+                'INSERT INTO users (id, name, password) VALUES ($1, $2, $3) RETURNING *', 
+                [randomUUID(), name, password]
+            );
 
-    this.users[id] = newUser;
-
-    return newUser;
-  }
+            if (result.rowCount === 1) {
+                return result.rows[0];
+            } else {
+                return null;
+            }
+        } catch (error) {
+            console.error('Error creating user:', error);
+            throw error;
+        }
+    }
 }
