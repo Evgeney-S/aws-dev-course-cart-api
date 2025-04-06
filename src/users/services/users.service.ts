@@ -11,9 +11,9 @@ export class UsersService {
     this.users = {};
   }
 
-    findOne(name: string): User | null {
+    async findOne(name: string): Promise<User | null> {
         try {
-            const result: any = db.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [name]);
+            const result: any = await db.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [name]);
 
             if (result.rowCount === 0) {
                 return null;
@@ -27,9 +27,9 @@ export class UsersService {
         }
     }
 
-    createOne({ name, password }: User): User | null {
+    async createOne({ name, password }: User): Promise<User> {
         try {
-            const result: any = db.query(
+            const result: any = await db.query(
                 'INSERT INTO users (id, name, password) VALUES ($1, $2, $3) RETURNING *', 
                 [randomUUID(), name, password]
             );
@@ -37,7 +37,7 @@ export class UsersService {
             if (result.rowCount === 1) {
                 return result.rows[0];
             } else {
-                return null;
+                throw new Error('Failed to create user');
             }
         } catch (error) {
             console.error('Error creating user:', error);

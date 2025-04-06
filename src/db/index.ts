@@ -15,14 +15,28 @@ const connectionSettings = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : undefined,
+    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432,
     database: process.env.DB_DATABASE,
 };
 
 const pool = new Pool({
     ...connectionSettings,
-    idleTimeoutMillis: 10*1000,
-    max: 10,
+    idleTimeoutMillis: 1000,
+    max: 1,
+    allowExitOnIdle: true,
+    ssl: {
+        rejectUnauthorized: false
+    },
+    // connectionTimeoutMillis: 5000,
+});
+
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    console.log('Connection config:', {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        database: process.env.DB_DATABASE,
+    });
 });
 
 interface QueryCallback {
@@ -38,18 +52,6 @@ export const query = (query: string, params?: any[], callback?: QueryCallback) =
         callback?.(null, res.rows);
     });
 };
-
-/*
-export const query = (query: string, params?: any[], callback?) => {
-    pool.query(query, params, (err, res) => {
-        if (err) {
-            console.error('Error executing query', err.stack);
-            return callback(err);
-        }
-        callback(null, res.rows);
-    });
-}
-*/
 
 export const client = pool.connect();
 

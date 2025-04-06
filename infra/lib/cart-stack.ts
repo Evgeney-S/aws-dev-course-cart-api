@@ -7,9 +7,10 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as dotenv from 'dotenv';
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 export class AWSDevCourseCartStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -28,6 +29,27 @@ export class AWSDevCourseCartStack extends cdk.Stack {
             'products'
         );
 
+        // VPC settings
+        const vpc = ec2.Vpc.fromLookup(this, 'VPC', {
+            vpcId: 'vpc-0f6f50027b89318bf', // By specified VPC ID
+            // isDefault: true, // To use the default VPC
+        });
+        // Security group
+        const cartLambdaSG = new ec2.SecurityGroup(this, 'CartLambdaSG', {
+            vpc,
+            description: 'Security group for Cart Lambda function',
+            allowAllOutbound: true,
+        });
+        const dbSecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
+            this,
+            'DBSecurityGroup',
+            'sg-0cc0b059d81b33c60'
+        );
+        dbSecurityGroup.addIngressRule(
+            cartLambdaSG,
+            ec2.Port.tcp(5432),
+            'Allow Cart Lambda access to PostgreSQL'
+        );
 
         // Create Lambda function (NodejsFunction uses esbuild for bundling)
         const cartLambda = new NodejsFunction(this, 'CartLambdaFunction', {
@@ -40,7 +62,8 @@ export class AWSDevCourseCartStack extends cdk.Stack {
             memorySize: 1024,
             // esbuild bundling settings
             bundling: {
-                minify: true,
+                // minify: true,
+                minify: false,
                 sourceMap: true,
                 externalModules: [
                     'aws-sdk',
@@ -71,17 +94,47 @@ export class AWSDevCourseCartStack extends cdk.Stack {
                 DB_PORT: process.env.DB_PORT ?? '',
                 DB_DATABASE: process.env.DB_DATABASE ?? '',
             },
-            logGroup
+            logGroup,
+            vpc: vpc,
+            vpcSubnets: {
+                subnetType: ec2.SubnetType.PUBLIC,
+            },
+            allowPublicSubnet: true,
+            securityGroups: [cartLambdaSG],
         });
 
         // Grant permissions to Lambda functions to access DynamoDB tables
         productsTable.grantReadData(cartLambda);
+        // Add necessary permissions for the Lambda to access VPC
+        cartLambda.addToRolePolicy(
+            new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                actions: [
+                    'ec2:CreateNetworkInterface',
+                    'ec2:DescribeNetworkInterfaces',
+                    'ec2:DeleteNetworkInterface',
+                    'ec2:AssignPrivateIpAddresses',
+                    'ec2:UnassignPrivateIpAddresses'
+                ],
+                resources: ['*'],
+            })
+        );
+
+        // Add function URL
+        const cartFnUrl = cartLambda.addFunctionUrl({
+            authType: cdk.aws_lambda.FunctionUrlAuthType.NONE,
+            cors: {
+                allowedOrigins: ['*'],
+                allowedMethods: [cdk.aws_lambda.HttpMethod.ALL],
+                allowedHeaders: ['*'],
+            },
+        });
         
-        // Output Lambda ARN (not used in this task)
+        // Output Lambda URL
         new cdk.CfnOutput(this, 'CartLambdaArn', {
-            value: cartLambda.functionArn,
-            description: 'Cart Lambda ARN',
-            exportName: 'CartLambdaArn',
+            value: cartFnUrl.url,
+            description: 'Cart Lambda URL',
+            exportName: 'CartLambdaFunctionUrl',
         });
 
         // We dont use API in this task, so just for notes
