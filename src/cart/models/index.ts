@@ -1,6 +1,7 @@
 export enum CartStatuses {
   OPEN = 'OPEN',
   STATUS = 'STATUS',
+  ORDERED = 'ORDERED',
 }
 
 export type Product = {
@@ -9,6 +10,10 @@ export type Product = {
   description: string;
   price: number;
 };
+
+export type ProductsDetails = {
+  [key: string]: Product;
+}
 
 export type CartItem = {
   product: Product;
